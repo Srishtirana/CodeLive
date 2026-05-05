@@ -10,6 +10,7 @@ function App() {
 
   const editorRef = useRef(null)
   const providerRef = useRef(null)
+  const bindingRef = useRef(null)
 
   const [username, setUsername] = useState(() => {
     return new URLSearchParams(window.location.search).get("username") || ""
@@ -20,7 +21,7 @@ function App() {
   const ydoc = useMemo(() => new Y.Doc(), [])
   const yText = useMemo(() => ydoc.getText("monaco"), [ydoc])
 
-  // ✅ Only assign editor
+  // ✅ Editor mount
   const handleMount = (editor) => {
     editorRef.current = editor
   }
@@ -32,12 +33,11 @@ function App() {
     window.history.pushState({}, "", "?username=" + value)
   }
 
-  // ✅ SOCKET PROVIDER
+  // ✅ SOCKET + PROVIDER
   useEffect(() => {
     if (!username) return
 
     const backendURL = import.meta.env.VITE_BACKEND_URL
-
     if (!backendURL) {
       console.error("Backend URL missing!")
       return
@@ -60,10 +60,12 @@ function App() {
 
     providerRef.current = provider
 
+    // 👇 Set user awareness
     provider.awareness.setLocalStateField("user", {
       username: username
     })
 
+    // 👇 Update users list
     const updateUsers = () => {
       const states = Array.from(provider.awareness.getStates().values())
       setUsers(
@@ -81,24 +83,39 @@ function App() {
     }
   }, [username])
 
-  // ✅ FIXED MONACO BINDING (correct timing)
+  // ✅ FINAL FIX — SAFE MONACO BINDING (AFTER SYNC)
   useEffect(() => {
     if (!editorRef.current) return
     if (!providerRef.current) return
 
-    console.log("Binding Monaco editor...")
+    const provider = providerRef.current
 
-    const binding = new MonacoBinding(
-      yText,
-      editorRef.current.getModel(),
-      new Set([editorRef.current]),
-      providerRef.current.awareness
-    )
+    const bindEditor = () => {
+      if (bindingRef.current) return // prevent duplicate binding
+
+      console.log("Binding Monaco AFTER sync...")
+
+      bindingRef.current = new MonacoBinding(
+        yText,
+        editorRef.current.getModel(),
+        new Set([editorRef.current]),
+        provider.awareness
+      )
+    }
+
+    if (provider.synced) {
+      bindEditor()
+    } else {
+      provider.once("sync", bindEditor)
+    }
 
     return () => {
-      binding.destroy()
+      if (bindingRef.current) {
+        bindingRef.current.destroy()
+        bindingRef.current = null
+      }
     }
-  }, [editorRef.current, providerRef.current])
+  }, [username])
 
   if (!username) {
     return (
@@ -124,8 +141,10 @@ function App() {
         <h2 className="text-white text-2xl font-bold p-4">Users</h2>
         <ul className="text-white p-4">
           {users.map((user, index) => (
-            <li key={index}
-              className="bg-gray-800 px-3 py-2 rounded-lg mb-2 font-mono text-sm tracking-wide">
+            <li
+              key={index}
+              className="bg-gray-800 px-3 py-2 rounded-lg mb-2 font-mono text-sm tracking-wide"
+            >
               {user.username}
             </li>
           ))}
