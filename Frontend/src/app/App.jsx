@@ -21,7 +21,6 @@ function App() {
   const ydoc = useMemo(() => new Y.Doc(), [])
   const yText = useMemo(() => ydoc.getText("monaco"), [ydoc])
 
-  // ✅ Editor mount
   const handleMount = (editor) => {
     editorRef.current = editor
   }
@@ -33,7 +32,7 @@ function App() {
     window.history.pushState({}, "", "?username=" + value)
   }
 
-  // ✅ SOCKET + PROVIDER
+  
   useEffect(() => {
     if (!username) return
 
@@ -43,9 +42,12 @@ function App() {
       return
     }
 
+    // 🔥 FIXED: dynamic room based on URL
+    const roomId = window.location.pathname || "default-room"
+
     const provider = new SocketIOProvider(
       backendURL,
-      "monaco-demo",
+      roomId,
       ydoc,
       {
         autoConnect: true,
@@ -54,18 +56,18 @@ function App() {
       }
     )
 
+    console.log("Joining room:", roomId)
+
     provider.on("status", (event) => {
       console.log("Socket status:", event.status)
     })
 
     providerRef.current = provider
 
-    // 👇 Set user awareness
     provider.awareness.setLocalStateField("user", {
       username: username
     })
 
-    // 👇 Update users list
     const updateUsers = () => {
       const states = Array.from(provider.awareness.getStates().values())
       setUsers(
@@ -83,7 +85,7 @@ function App() {
     }
   }, [username])
 
-  // ✅ FINAL FIX — SAFE MONACO BINDING (AFTER SYNC)
+  
   useEffect(() => {
     if (!editorRef.current) return
     if (!providerRef.current) return
@@ -91,7 +93,7 @@ function App() {
     const provider = providerRef.current
 
     const bindEditor = () => {
-      if (bindingRef.current) return // prevent duplicate binding
+      if (bindingRef.current) return
 
       console.log("Binding Monaco AFTER sync...")
 
