@@ -6,6 +6,7 @@ import * as Y from "yjs"
 import { SocketIOProvider } from "y-socket.io"
 
 function App() {
+  console.log("Backend URL:", import.meta.env.VITE_BACKEND_URL)
   const editorRef = useRef(null)
   const providerRef = useRef(null) // 
 
@@ -40,7 +41,7 @@ function App() {
   useEffect(() => {
     if (username) {
       const provider = new SocketIOProvider(
-        "http://localhost:3000",
+  import.meta.env.VITE_BACKEND_URL,
         "monaco-demo",
         ydoc,
         { autoConnect: true }
