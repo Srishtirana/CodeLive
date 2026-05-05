@@ -21,6 +21,7 @@ function App() {
   const ydoc = useMemo(() => new Y.Doc(), [])
   const yText = useMemo(() => ydoc.getText("monaco"), [ydoc])
 
+  // ✅ editor mount
   const handleMount = (editor) => {
     editorRef.current = editor
   }
@@ -32,7 +33,7 @@ function App() {
     window.history.pushState({}, "", "?username=" + value)
   }
 
-  
+  // ✅ SOCKET PROVIDER
   useEffect(() => {
     if (!username) return
 
@@ -42,22 +43,21 @@ function App() {
       return
     }
 
-   
-   const roomId =
-  window.location.pathname.split("/").filter(Boolean).join("-") || "default-room"
+    const roomId =
+      window.location.pathname.split("/").filter(Boolean).join("-") || "default-room"
 
-const provider = new SocketIOProvider(
-  backendURL,
-  roomId,
-  ydoc,
-  {
-    autoConnect: true,
-    connect: true,
-    transports: ["websocket"]
-  }
-)
+    console.log("Joining room:", roomId)
 
-console.log("Joining room:", roomId)
+    const provider = new SocketIOProvider(
+      backendURL,
+      roomId,
+      ydoc,
+      {
+        autoConnect: true,
+        connect: true,
+        transports: ["websocket"]
+      }
+    )
 
     provider.on("status", (event) => {
       console.log("Socket status:", event.status)
@@ -65,6 +65,7 @@ console.log("Joining room:", roomId)
 
     providerRef.current = provider
 
+    // users awareness
     provider.awareness.setLocalStateField("user", {
       username: username
     })
@@ -84,16 +85,19 @@ console.log("Joining room:", roomId)
     return () => {
       provider.disconnect()
     }
-  }, }, [editorRef.current, providerRef.current])
+  }, [username])
 
-  
+  // ✅ FINAL WORKING BINDING (stable + reliable)
   useEffect(() => {
-    if (!editorRef.current) return
-    if (!providerRef.current) return
+    if (!username) return
 
-    const provider = providerRef.current
+    const interval = setInterval(() => {
+      if (!editorRef.current || !providerRef.current) return
 
-    const bindEditor = () => {
+      const provider = providerRef.current
+
+      if (!provider.synced) return
+
       if (bindingRef.current) return
 
       console.log("Binding Monaco AFTER sync...")
@@ -104,15 +108,10 @@ console.log("Joining room:", roomId)
         new Set([editorRef.current]),
         provider.awareness
       )
-    }
-
-    if (provider.synced) {
-      bindEditor()
-    } else {
-      provider.once("sync", bindEditor)
-    }
+    }, 100)
 
     return () => {
+      clearInterval(interval)
       if (bindingRef.current) {
         bindingRef.current.destroy()
         bindingRef.current = null
@@ -120,6 +119,7 @@ console.log("Joining room:", roomId)
     }
   }, [username])
 
+  // UI
   if (!username) {
     return (
       <main className="h-screen w-full bg-black flex items-center justify-center">
