@@ -5,19 +5,23 @@ import { YSocketIO } from "y-socket.io/dist/server"
 
 import path from "path"
 import { fileURLToPath } from "url"
+import dotenv from "dotenv"
+
+dotenv.config()
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 const app = express()
-app.use(express.static("public"))
+app.use(express.static(path.join(__dirname, "public")))
+
 const httpServer = createServer(app)
 
 const io = new Server(httpServer, {
-    cors: {
-        origin: "*",
-        methods: ["GET", "POST"]
-    }
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  }
 })
 
 const ySocketIO = new YSocketIO(io)
@@ -30,12 +34,12 @@ app.get('/health', (req, res) => {
   })
 })
 
-
-
 app.use((req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"))
 })
 
-httpServer.listen(3000, () => {
-    console.log("Server is running on port 3000")
+const PORT = process.env.PORT || 5001;
+
+httpServer.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
 })
