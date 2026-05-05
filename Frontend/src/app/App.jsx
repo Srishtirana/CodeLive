@@ -42,21 +42,22 @@ function App() {
       return
     }
 
-    // 🔥 FIXED: dynamic room based on URL
-    const roomId = window.location.pathname || "default-room"
+   
+   const roomId =
+  window.location.pathname.split("/").filter(Boolean).join("-") || "default-room"
 
-    const provider = new SocketIOProvider(
-      backendURL,
-      roomId,
-      ydoc,
-      {
-        autoConnect: true,
-        connect: true,
-        transports: ["websocket"]
-      }
-    )
+const provider = new SocketIOProvider(
+  backendURL,
+  roomId,
+  ydoc,
+  {
+    autoConnect: true,
+    connect: true,
+    transports: ["websocket"]
+  }
+)
 
-    console.log("Joining room:", roomId)
+console.log("Joining room:", roomId)
 
     provider.on("status", (event) => {
       console.log("Socket status:", event.status)
@@ -83,7 +84,7 @@ function App() {
     return () => {
       provider.disconnect()
     }
-  }, [username])
+  }, }, [editorRef.current, providerRef.current])
 
   
   useEffect(() => {
