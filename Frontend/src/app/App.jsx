@@ -20,7 +20,7 @@ function App() {
   const ydoc = useMemo(() => new Y.Doc(), [])
   const yText = useMemo(() => ydoc.getText("monaco"), [ydoc])
 
-  // ✅ FIXED: Only assign editor here
+  // ✅ Only assign editor
   const handleMount = (editor) => {
     editorRef.current = editor
   }
@@ -32,7 +32,7 @@ function App() {
     window.history.pushState({}, "", "?username=" + value)
   }
 
-  // ✅ SOCKET + PROVIDER
+  // ✅ SOCKET PROVIDER
   useEffect(() => {
     if (!username) return
 
@@ -81,9 +81,12 @@ function App() {
     }
   }, [username])
 
-  // ✅ FIXED: Safe Monaco binding
+  // ✅ FIXED MONACO BINDING (correct timing)
   useEffect(() => {
-    if (!editorRef.current || !providerRef.current) return
+    if (!editorRef.current) return
+    if (!providerRef.current) return
+
+    console.log("Binding Monaco editor...")
 
     const binding = new MonacoBinding(
       yText,
@@ -95,7 +98,7 @@ function App() {
     return () => {
       binding.destroy()
     }
-  }, [username])
+  }, [editorRef.current, providerRef.current])
 
   if (!username) {
     return (
