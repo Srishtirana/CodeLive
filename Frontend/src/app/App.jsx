@@ -7,8 +7,9 @@ import { SocketIOProvider } from "y-socket.io"
 
 function App() {
   console.log("Backend URL:", import.meta.env.VITE_BACKEND_URL)
+
   const editorRef = useRef(null)
-  const providerRef = useRef(null) // 
+  const providerRef = useRef(null)
 
   const [username, setUsername] = useState(() => {
     return new URLSearchParams(window.location.search).get("username") || ""
@@ -19,16 +20,9 @@ function App() {
   const ydoc = useMemo(() => new Y.Doc(), [])
   const yText = useMemo(() => ydoc.getText("monaco"), [ydoc])
 
+  // ✅ FIXED: Only assign editor here
   const handleMount = (editor) => {
     editorRef.current = editor
-
-    
-    new MonacoBinding(
-      yText,
-      editorRef.current.getModel(),
-      new Set([editorRef.current]),
-      providerRef.current?.awareness
-    )
   }
 
   const handlejoin = (e) => {
@@ -38,43 +32,68 @@ function App() {
     window.history.pushState({}, "", "?username=" + value)
   }
 
+  // ✅ SOCKET + PROVIDER
   useEffect(() => {
-    if (username) {
-      const provider = new SocketIOProvider(
-  import.meta.env.VITE_BACKEND_URL,
-        "monaco-demo",
-        ydoc,
-        { autoConnect: true }
+    if (!username) return
+
+    const backendURL = import.meta.env.VITE_BACKEND_URL
+
+    if (!backendURL) {
+      console.error("Backend URL missing!")
+      return
+    }
+
+    const provider = new SocketIOProvider(
+      backendURL,
+      "monaco-demo",
+      ydoc,
+      {
+        autoConnect: true,
+        connect: true,
+        transports: ["websocket"]
+      }
+    )
+
+    provider.on("status", (event) => {
+      console.log("Socket status:", event.status)
+    })
+
+    providerRef.current = provider
+
+    provider.awareness.setLocalStateField("user", {
+      username: username
+    })
+
+    const updateUsers = () => {
+      const states = Array.from(provider.awareness.getStates().values())
+      setUsers(
+        states
+          .filter(state => state.user && state.user.username)
+          .map(state => state.user)
       )
+    }
 
-      providerRef.current = provider 
+    updateUsers()
+    provider.awareness.on("change", updateUsers)
 
-      provider.awareness.setLocalStateField("user", {
-        username: username
-      })
+    return () => {
+      provider.disconnect()
+    }
+  }, [username])
 
-      const updateUsers = () => {
-        const states = Array.from(provider.awareness.getStates().values())
-        setUsers(
-          states
-            .filter(state => state.user && state.user.username)
-            .map(state => state.user)
-        )
-      }
+  // ✅ FIXED: Safe Monaco binding
+  useEffect(() => {
+    if (!editorRef.current || !providerRef.current) return
 
-      updateUsers()
-      provider.awareness.on("change", updateUsers)
+    const binding = new MonacoBinding(
+      yText,
+      editorRef.current.getModel(),
+      new Set([editorRef.current]),
+      providerRef.current.awareness
+    )
 
-      function handleBeforeUnload() {
-        provider.awareness.setLocalStateField("user", null)
-      }
-
-      window.addEventListener("beforeunload", handleBeforeUnload)
-
-      return () => {
-        provider.disconnect()
-        window.removeEventListener("beforeunload", handleBeforeUnload)
-      }
+    return () => {
+      binding.destroy()
     }
   }, [username])
 
@@ -103,7 +122,9 @@ function App() {
         <ul className="text-white p-4">
           {users.map((user, index) => (
             <li key={index}
-            className="bg-gray-800 px-3 py-2 rounded-lg mb-2 font-mono text-sm tracking-wide">{user.username}</li>
+              className="bg-gray-800 px-3 py-2 rounded-lg mb-2 font-mono text-sm tracking-wide">
+              {user.username}
+            </li>
           ))}
         </ul>
       </aside>
