@@ -1,93 +1,101 @@
 import './App.css'
 import { Editor } from '@monaco-editor/react'
-import { MonacoBinding } from "y-monaco"
+import { MonacoBinding } from 'y-monaco'
 import { useRef, useMemo, useState, useEffect } from 'react'
-import * as Y from "yjs"
-import { SocketIOProvider } from "y-socket.io"
+import * as Y from 'yjs'
+import { SocketIOProvider } from 'y-socket.io'
 
 function App() {
-  console.log("Backend URL:", import.meta.env.VITE_BACKEND_URL)
+  console.log('Backend URL:', import.meta.env.VITE_BACKEND_URL)
+
+  if (window.location.pathname === '/') {
+    const randomRoom = Math.random().toString(36).substring(2, 8)
+    window.location.pathname = `/room/${randomRoom}`
+  }
 
   const editorRef = useRef(null)
   const providerRef = useRef(null)
   const bindingRef = useRef(null)
 
   const [username, setUsername] = useState(() => {
-    return new URLSearchParams(window.location.search).get("username") || ""
+    return new URLSearchParams(window.location.search).get('username') || ''
   })
 
   const [users, setUsers] = useState([])
 
   const ydoc = useMemo(() => new Y.Doc(), [])
-  const yText = useMemo(() => ydoc.getText("monaco"), [ydoc])
+  const yText = useMemo(() => ydoc.getText('monaco'), [ydoc])
 
-  // ✅ editor mount
   const handleMount = (editor) => {
     editorRef.current = editor
   }
 
   const handlejoin = (e) => {
     e.preventDefault()
+
     const value = e.target.username.value
+
     setUsername(value)
-    window.history.pushState({}, "", "?username=" + value)
+
+    window.history.pushState({}, '', '?username=' + value)
   }
 
-  // ✅ SOCKET PROVIDER
   useEffect(() => {
     if (!username) return
 
     const backendURL = import.meta.env.VITE_BACKEND_URL
+
     if (!backendURL) {
-      console.error("Backend URL missing!")
+      console.error('Backend URL missing!')
       return
     }
 
     const roomId =
-      window.location.pathname.split("/").filter(Boolean).join("-") || "default-room"
+      window.location.pathname.replace(/\//g, '') || 'default-room'
 
-    console.log("Joining room:", roomId)
+    console.log('Joining room:', roomId)
 
     const provider = new SocketIOProvider(
       backendURL,
       roomId,
-      ydoc,
-      {
-        autoConnect: true,
-        connect: true,
-        transports: ["websocket"]
-      }
+      ydoc
     )
 
-    provider.on("status", (event) => {
-      console.log("Socket status:", event.status)
+    provider.on('status', (event) => {
+      console.log('Socket status:', event.status)
     })
 
     providerRef.current = provider
 
-    // users awareness
-    provider.awareness.setLocalStateField("user", {
+    provider.awareness.setLocalStateField('user', {
       username: username
     })
 
     const updateUsers = () => {
       const states = Array.from(provider.awareness.getStates().values())
+
       setUsers(
         states
-          .filter(state => state.user && state.user.username)
-          .map(state => state.user)
+          .filter((state) => state.user && state.user.username)
+          .map((state) => state.user)
       )
     }
 
     updateUsers()
-    provider.awareness.on("change", updateUsers)
+
+    provider.awareness.on('change', updateUsers)
 
     return () => {
+      provider.awareness.destroy()
       provider.disconnect()
-    }
-  }, [username])
 
-  // ✅ FINAL WORKING BINDING (stable + reliable)
+      if (bindingRef.current) {
+        bindingRef.current.destroy()
+        bindingRef.current = null
+      }
+    }
+  }, [username, ydoc])
+
   useEffect(() => {
     if (!username) return
 
@@ -100,7 +108,7 @@ function App() {
 
       if (bindingRef.current) return
 
-      console.log("Binding Monaco AFTER sync...")
+      console.log('Binding Monaco AFTER sync...')
 
       bindingRef.current = new MonacoBinding(
         yText,
@@ -112,14 +120,14 @@ function App() {
 
     return () => {
       clearInterval(interval)
+
       if (bindingRef.current) {
         bindingRef.current.destroy()
         bindingRef.current = null
       }
     }
-  }, [username])
+  }, [username, yText])
 
-  // UI
   if (!username) {
     return (
       <main className="h-screen w-full bg-black flex items-center justify-center">
@@ -130,6 +138,7 @@ function App() {
             className="p-2 rounded-md bg-gray-700 text-white"
             name="username"
           />
+
           <button className="p-2 rounded-md bg-pink-900 text-white font-bold">
             Join
           </button>
@@ -141,7 +150,10 @@ function App() {
   return (
     <main className="h-screen w-full bg-black flex gap-4 p-4">
       <aside className="h-full w-1/4 bg-pink-900 rounded-2xl">
-        <h2 className="text-white text-2xl font-bold p-4">Users</h2>
+        <h2 className="text-white text-2xl font-bold p-4">
+          Users
+        </h2>
+
         <ul className="text-white p-4">
           {users.map((user, index) => (
             <li
